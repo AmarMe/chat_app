@@ -323,7 +323,7 @@ class _PersonScreenState extends State<PersonScreen> {
                           ),
                           // ),
 
-                          //Emoji display widget which is written below
+                          //Emoji display widget
 
                           Offstage(
                             offstage: isEmojivisible,
