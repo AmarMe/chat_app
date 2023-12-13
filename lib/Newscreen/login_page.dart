@@ -148,7 +148,7 @@ class _LoginScreenState extends State<LoginPage> {
                 border: InputBorder.none,
                 hintText: "phone number",
                 contentPadding: EdgeInsets.all(9),
-                hintStyle: TextStyle(letterSpacing: 2),
+                hintStyle: TextStyle(letterSpacing: 1),
               ),
             ),
           ),
