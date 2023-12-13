@@ -26,7 +26,7 @@ class myapp extends StatelessWidget {
       ),
 
       // darkTheme: ThemeData(brightness: Brightness.dark),
-      home: LandingScreen(),
+      home: LoginScreen(),
     );
   }
 }
