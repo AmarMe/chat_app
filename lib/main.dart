@@ -1,4 +1,5 @@
 import 'package:camera/camera.dart';
+import 'package:chat_app/Newscreen/Landing_screen.dart';
 import 'package:chat_app/screens/Homescreen.dart';
 import 'package:chat_app/screens/camera_screen.dart';
 import 'package:chat_app/screens/login_screen.dart';
@@ -25,7 +26,7 @@ class myapp extends StatelessWidget {
       ),
 
       // darkTheme: ThemeData(brightness: Brightness.dark),
-      home: LoginScreen(),
+      home: LandingScreen(),
     );
   }
 }

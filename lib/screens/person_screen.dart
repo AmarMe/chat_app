@@ -39,7 +39,8 @@ class _PersonScreenState extends State<PersonScreen> {
   }
 
   void connect() {
-    socket = IO.io("http://192.168.1.13:5000", <String, dynamic>{
+    socket =
+        IO.io("https://chatapp-server-5l70.onrender.com", <String, dynamic>{
       "transports": ["websocket"],
       "autoConnect": false
     });
