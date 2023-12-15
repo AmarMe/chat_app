@@ -16,6 +16,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   late TabController _controller;
+  late Function onimagesend;
   @override
   void initState() {
     // TODO: implement initState
@@ -79,7 +80,9 @@ class _HomeScreenState extends State<HomeScreen>
       body: TabBarView(
         controller: _controller,
         children: [
-          CameraPage(),
+          CameraPage(
+              // onimagesend: onimagesend,
+              ),
           ChatPage(
             chatmodel: widget.chats,
             sourcechat: widget.sourcechat,

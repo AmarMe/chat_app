@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:chat_app/CustomUI/Replyfile_card.dart';
 import 'package:chat_app/CustomUI/ownfile_card.dart';
 import 'package:chat_app/CustomUI/ownmessage_card.dart';
@@ -11,6 +13,7 @@ import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:http/http.dart' as http;
 
 class PersonScreen extends StatefulWidget {
   const PersonScreen(
@@ -32,6 +35,7 @@ class _PersonScreenState extends State<PersonScreen> {
   List<Messagemodel> messages = [];
   ImagePicker _picker = ImagePicker();
   XFile? file;
+  int popitem = 0;
 
   @override
   void initState() {
@@ -47,7 +51,7 @@ class _PersonScreenState extends State<PersonScreen> {
 
   void connect() {
     //https://chatapp-server-5l70.onrender.com
-    socket = IO.io("https://192.168.1.13:5000", <String, dynamic>{
+    socket = IO.io("http://192.168.43.54:5000", <String, dynamic>{
       "transports": ["websocket"],
       "autoConnect": false
     });
@@ -85,6 +89,34 @@ class _PersonScreenState extends State<PersonScreen> {
 
     setState(() {
       messages.add(messagemodel);
+    });
+  }
+
+  void onImageSend(String path, String message) async {
+    print("the image path is $message");
+    for (int i = 0; i < popitem; i++) {
+      Navigator.pop(context);
+    }
+    setState(() {
+      popitem = 0;
+    });
+    var req = http.MultipartRequest(
+        "post", Uri.parse("http://192.168.43.54:5000/routes/add-image"));
+    req.files.add(await http.MultipartFile.fromPath("img", path));
+    req.headers.addAll({
+      "content-type": "multipart/form-data",
+    });
+    http.StreamedResponse response = await req.send();
+    var httpResponse = await http.Response.fromStream(response);
+    var data = json.decode(httpResponse.body);
+    print(data['path']);
+
+    setmessage("source", message, path);
+    socket.emit("message", {
+      "message": message,
+      "sourceid": widget.sourcechat.id,
+      "targetid": widget.chatmodel.id,
+      "path": data['path']
     });
   }
 
@@ -208,19 +240,35 @@ class _PersonScreenState extends State<PersonScreen> {
                           return Container(height: 70);
                         }
                         if (messages[index].type == "source") {
-                          return OwnMessageCard(
+                          if (messages[index].path != '') {
+                            return OwnfileCard(
+                              path: messages[index].path.toString(),
                               message: messages[index].message.toString(),
-                              time: messages[index]
-                                  .time
-                                  .toString()
-                                  .substring(11, 16));
+                              time: messages[index].time.toString(),
+                            );
+                          } else {
+                            return OwnMessageCard(
+                                message: messages[index].message.toString(),
+                                time: messages[index]
+                                    .time
+                                    .toString()
+                                    .substring(11, 16));
+                          }
                         } else {
-                          return ReplyMessageCard(
+                          if (messages[index].path != '') {
+                            return ReplyfileCard(
+                              path: messages[index].path.toString(),
                               message: messages[index].message.toString(),
-                              time: messages[index]
-                                  .time
-                                  .toString()
-                                  .substring(11, 16));
+                              time: messages[index].time.toString(),
+                            );
+                          } else {
+                            return ReplyMessageCard(
+                                message: messages[index].message.toString(),
+                                time: messages[index]
+                                    .time
+                                    .toString()
+                                    .substring(11, 16));
+                          }
                         }
                       },
                     ),
@@ -300,11 +348,18 @@ class _PersonScreenState extends State<PersonScreen> {
                                                   Icons.attach_file)),
                                           IconButton(
                                               onPressed: () {
+                                                setState(() {
+                                                  popitem = 2;
+                                                });
+
                                                 Navigator.push(
                                                     context,
                                                     MaterialPageRoute(
                                                         builder: (builder) =>
-                                                            CameraScreen()));
+                                                            CameraScreen(
+                                                              onImageSend:
+                                                                  onImageSend,
+                                                            )));
                                               },
                                               icon:
                                                   const Icon(Icons.camera_alt))
@@ -442,22 +497,31 @@ class _PersonScreenState extends State<PersonScreen> {
                     width: 40,
                   ),
                   bottomsheetIcon(Icons.camera, Colors.pink, "Camera", () {
+                    setState(() {
+                      popitem = 3;
+                    });
                     Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (builder) => CameraScreen()));
+                            builder: (builder) => CameraScreen(
+                                  onImageSend: onImageSend,
+                                )));
                   }),
                   const SizedBox(
                     width: 40,
                   ),
                   bottomsheetIcon(Icons.photo, Colors.purple, "Gallery",
                       () async {
+                    setState(() {
+                      popitem = 2;
+                    });
                     file = await _picker.pickImage(source: ImageSource.gallery);
                     Navigator.push(
                         context,
                         MaterialPageRoute(
                             builder: (builder) => CameraView(
                                   path: file!.path,
+                                  onImageSend: onImageSend,
                                 )));
                   }),
                 ],
