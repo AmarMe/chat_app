@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 class CameraView extends StatelessWidget {
-  const CameraView({super.key, required this.path});
+  const CameraView({super.key, required this.path, required this.onImageSend});
   final String path;
+  final Function onImageSend;
+  static TextEditingController _controller = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -60,10 +62,11 @@ class CameraView extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 color: Colors.black38,
                 child: TextFormField(
+                  controller: _controller,
                   style: TextStyle(color: Colors.white, fontSize: 18),
                   maxLines: 5,
                   minLines: 1,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                       border: InputBorder.none,
                       prefixIcon: Icon(
                         Icons.add_photo_alternate,
@@ -72,13 +75,18 @@ class CameraView extends StatelessWidget {
                       ),
                       hintText: 'Add captions...',
                       hintStyle: TextStyle(color: Colors.white, fontSize: 18),
-                      suffixIcon: CircleAvatar(
-                        radius: 25,
-                        backgroundColor: Colors.teal,
-                        child: Icon(
-                          Icons.check,
-                          color: Colors.white,
-                          size: 25,
+                      suffixIcon: InkWell(
+                        onTap: () {
+                          onImageSend(path, _controller.text.trim());
+                        },
+                        child: CircleAvatar(
+                          radius: 25,
+                          backgroundColor: Colors.teal,
+                          child: Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 25,
+                          ),
                         ),
                       )),
                 ),

@@ -1,11 +1,19 @@
+import 'dart:convert';
+
+import 'package:chat_app/CustomUI/Replyfile_card.dart';
+import 'package:chat_app/CustomUI/ownfile_card.dart';
 import 'package:chat_app/CustomUI/ownmessage_card.dart';
 import 'package:chat_app/CustomUI/replymessage_card.dart';
 import 'package:chat_app/model/chatmodel.dart';
 import 'package:chat_app/model/messagemodel.dart';
+import 'package:chat_app/screens/camera_screen.dart';
+import 'package:chat_app/screens/cameraview_screen.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:http/http.dart' as http;
 
 class PersonScreen extends StatefulWidget {
   const PersonScreen(
@@ -25,6 +33,9 @@ class _PersonScreenState extends State<PersonScreen> {
   late IO.Socket socket;
   bool sendbutton = false;
   List<Messagemodel> messages = [];
+  ImagePicker _picker = ImagePicker();
+  XFile? file;
+  int popitem = 0;
 
   @override
   void initState() {
@@ -39,8 +50,8 @@ class _PersonScreenState extends State<PersonScreen> {
   }
 
   void connect() {
-    socket =
-        IO.io("https://chatapp-server-5l70.onrender.com", <String, dynamic>{
+    //https://chatapp-server-5l70.onrender.com
+    socket = IO.io("http://192.168.43.54:5000", <String, dynamic>{
       "transports": ["websocket"],
       "autoConnect": false
     });
@@ -50,7 +61,7 @@ class _PersonScreenState extends State<PersonScreen> {
       print("connected");
       socket.on("message", (msg) {
         print(msg);
-        setmessage("destination", msg["message"]);
+        setmessage("destination", msg["message"], msg["path"]);
         _scrollController.animateTo(_scrollController.position.maxScrollExtent,
             duration: Duration(milliseconds: 300), curve: Curves.easeOut);
       });
@@ -59,18 +70,53 @@ class _PersonScreenState extends State<PersonScreen> {
   }
 
   //send message one to one
-  void sendmessage(String message, int? sourceid, int? targetid) {
-    setmessage("source", message);
-    socket.emit("message",
-        {"message": message, "sourceid": sourceid, "targetid": targetid});
+  void sendmessage(String message, int? sourceid, int? targetid, String path) {
+    setmessage("source", message, path);
+    socket.emit("message", {
+      "message": message,
+      "sourceid": sourceid,
+      "targetid": targetid,
+      "path": path
+    });
   }
 
-  void setmessage(String type, String message) {
+  void setmessage(String type, String message, String path) {
     Messagemodel messagemodel = Messagemodel(
-        type: type, message: message, time: DateTime.now().toString());
+        type: type,
+        message: message,
+        time: DateTime.now().toString(),
+        path: path);
 
     setState(() {
       messages.add(messagemodel);
+    });
+  }
+
+  void onImageSend(String path, String message) async {
+    print("the image path is $message");
+    for (int i = 0; i < popitem; i++) {
+      Navigator.pop(context);
+    }
+    setState(() {
+      popitem = 0;
+    });
+    var req = http.MultipartRequest(
+        "post", Uri.parse("http://192.168.43.54:5000/routes/add-image"));
+    req.files.add(await http.MultipartFile.fromPath("img", path));
+    req.headers.addAll({
+      "content-type": "multipart/form-data",
+    });
+    http.StreamedResponse response = await req.send();
+    var httpResponse = await http.Response.fromStream(response);
+    var data = json.decode(httpResponse.body);
+    print(data['path']);
+
+    setmessage("source", message, path);
+    socket.emit("message", {
+      "message": message,
+      "sourceid": widget.sourcechat.id,
+      "targetid": widget.chatmodel.id,
+      "path": data['path']
     });
   }
 
@@ -184,7 +230,7 @@ class _PersonScreenState extends State<PersonScreen> {
               child: Column(
                 children: [
                   Expanded(
-                    // height: MediaQuery.of(context).size.height - 180,
+                    //   // height: MediaQuery.of(context).size.height - 180,
                     child: ListView.builder(
                       shrinkWrap: true,
                       controller: _scrollController,
@@ -194,22 +240,44 @@ class _PersonScreenState extends State<PersonScreen> {
                           return Container(height: 70);
                         }
                         if (messages[index].type == "source") {
-                          return OwnMessageCard(
+                          if (messages[index].path != '') {
+                            return OwnfileCard(
+                              path: messages[index].path.toString(),
                               message: messages[index].message.toString(),
-                              time: messages[index]
-                                  .time
-                                  .toString()
-                                  .substring(11, 16));
+                              time: messages[index].time.toString(),
+                            );
+                          } else {
+                            return OwnMessageCard(
+                                message: messages[index].message.toString(),
+                                time: messages[index]
+                                    .time
+                                    .toString()
+                                    .substring(11, 16));
+                          }
                         } else {
-                          return ReplyMessageCard(
+                          if (messages[index].path != '') {
+                            return ReplyfileCard(
+                              path: messages[index].path.toString(),
                               message: messages[index].message.toString(),
-                              time: messages[index]
-                                  .time
-                                  .toString()
-                                  .substring(11, 16));
+                              time: messages[index].time.toString(),
+                            );
+                          } else {
+                            return ReplyMessageCard(
+                                message: messages[index].message.toString(),
+                                time: messages[index]
+                                    .time
+                                    .toString()
+                                    .substring(11, 16));
+                          }
                         }
                       },
                     ),
+                    // child: ListView(
+                    //   children: [
+                    //     OwnfileCard(),
+                    //     ReplyfileCard(),
+                    //   ],
+                    // ),
                   ),
                   Align(
                     alignment: Alignment.bottomCenter,
@@ -279,7 +347,20 @@ class _PersonScreenState extends State<PersonScreen> {
                                               icon: const Icon(
                                                   Icons.attach_file)),
                                           IconButton(
-                                              onPressed: () {},
+                                              onPressed: () {
+                                                setState(() {
+                                                  popitem = 2;
+                                                });
+
+                                                Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                        builder: (builder) =>
+                                                            CameraScreen(
+                                                              onImageSend:
+                                                                  onImageSend,
+                                                            )));
+                                              },
                                               icon:
                                                   const Icon(Icons.camera_alt))
                                         ],
@@ -303,10 +384,10 @@ class _PersonScreenState extends State<PersonScreen> {
                                                 Duration(milliseconds: 300),
                                             curve: Curves.easeOut);
                                         sendmessage(
-                                          _controller.text,
-                                          widget.sourcechat.id,
-                                          widget.chatmodel.id,
-                                        );
+                                            _controller.text,
+                                            widget.sourcechat.id,
+                                            widget.chatmodel.id,
+                                            "");
                                         _controller.clear();
                                         setState(() {
                                           sendbutton = false;
@@ -410,15 +491,39 @@ class _PersonScreenState extends State<PersonScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  bottomsheetIcon(Icons.file_copy, Colors.indigo, "Documents"),
+                  bottomsheetIcon(
+                      Icons.file_copy, Colors.indigo, "Documents", () {}),
                   const SizedBox(
                     width: 40,
                   ),
-                  bottomsheetIcon(Icons.camera, Colors.pink, "Camera"),
+                  bottomsheetIcon(Icons.camera, Colors.pink, "Camera", () {
+                    setState(() {
+                      popitem = 3;
+                    });
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (builder) => CameraScreen(
+                                  onImageSend: onImageSend,
+                                )));
+                  }),
                   const SizedBox(
                     width: 40,
                   ),
-                  bottomsheetIcon(Icons.photo, Colors.purple, "Gallery"),
+                  bottomsheetIcon(Icons.photo, Colors.purple, "Gallery",
+                      () async {
+                    setState(() {
+                      popitem = 2;
+                    });
+                    file = await _picker.pickImage(source: ImageSource.gallery);
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (builder) => CameraView(
+                                  path: file!.path,
+                                  onImageSend: onImageSend,
+                                )));
+                  }),
                 ],
               ),
               const SizedBox(
@@ -427,15 +532,16 @@ class _PersonScreenState extends State<PersonScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  bottomsheetIcon(Icons.headset, Colors.orange, "Audio"),
+                  bottomsheetIcon(Icons.headset, Colors.orange, "Audio", () {}),
                   const SizedBox(
                     width: 40,
                   ),
-                  bottomsheetIcon(Icons.location_pin, Colors.teal, "location"),
+                  bottomsheetIcon(
+                      Icons.location_pin, Colors.teal, "location", () {}),
                   const SizedBox(
                     width: 40,
                   ),
-                  bottomsheetIcon(Icons.person, Colors.blue, "Contact"),
+                  bottomsheetIcon(Icons.person, Colors.blue, "Contact", () {}),
                 ],
               )
             ],
@@ -446,9 +552,10 @@ class _PersonScreenState extends State<PersonScreen> {
   }
 
   //each bottomsheet icon widget
-  Widget bottomsheetIcon(IconData icon, Color color, String text) {
+  Widget bottomsheetIcon(
+      IconData icon, Color color, String text, VoidCallback onTap) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       child: Column(
         children: [
           CircleAvatar(
